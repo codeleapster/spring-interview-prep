@@ -207,7 +207,7 @@ public class ApplicationConfiguration {
 - Advanced Component Scanning Rules
 ```java
 @ComponentScan(
-	basePackages = "com.spring.professional.exam.tutorial.module01.question10.annotations.beans",
+	basePackages = "com.codeleapster.spring.notes.module01.question10.annotations.beans",
 	//basePackageClasses = SpringBean1.class,
 	includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*Bean.*"),
 	excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*Bean1.*")
@@ -419,7 +419,7 @@ public class ApplicationConfiguration {
 - Advanced Component Scanning Rules
 ```java
 @ComponentScan(
-        basePackages = "com.spring.professional.exam.tutorial.module01.question15.advanced.beans",
+        basePackages = "com.codeleapster.spring.notes.module01.question15.advanced.beans",
         includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*Bean"),
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*(Controller|Service).*")
 )
