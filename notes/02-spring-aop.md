@@ -36,7 +36,7 @@ Implementing cross-cutting concerns without using AOP, produces following challe
 
 In Spring AOP Join Point is always method execution.
 
-``java
+```java
 public interface CurrencyService {
     float getExchangeRate(String from, String to); //Joinpoint
 
@@ -46,7 +46,7 @@ public interface CurrencyService {
 
     String getCurrencyCountryName(CurrencyId currencyId); //Joinpoint
 }
-``
+```
 
 Aspect Oriented Programming concept in general, distinguishes additional Join Points, some of them include:
 - Method Execution / Invocation
@@ -102,7 +102,7 @@ Example of Pointcut Expressions:
 
 **Advice** is additional behavior that will be inserted into the code, at each join point matched by pointcut.
 
-``java
+```java
 @Pointcut("@annotation(com.codeleapster.spring.notes.module02.question02.annotations.InTransaction)")
 public void transactionAnnotationPointcut() { // Pointcut
 }
@@ -116,11 +116,11 @@ public void beforeTransactionAnnotationAdvice() {
 public void beforeThisCurrenciesRepository() {
     System.out.println("Before - this(CurrenciesRepositoryImpl)");
 }
-``
+```
 
 **Aspect** brings together Pointcut and Advice. Usually it represents single behavior implemented by advice that will be added to all join points matched by pointcut.
 
-``java
+```java
 @Component
 @Aspect
 public class CurrenciesRepositoryAspect { // Aspect
@@ -130,7 +130,7 @@ public class CurrenciesRepositoryAspect { // Aspect
         System.out.println("Before - this(CurrenciesRepositoryImpl)"); // Advice
     }
 }
-``
+```
 
 **Weaving** is the process of applying aspects, which modifies code behavior at join points that have matching pointcuts and associated advices. During weaving aspects and application code is combined which enables execution of cross cutting concerns.
 
