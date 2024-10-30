@@ -824,7 +824,7 @@ Spring Boot Actuator supports two protocols:
 - HTTP
 - JMX
 
-HTTP endpoints can be accessed by any HTTP Client, like CURL or Web Browser, by default following are enabled:
+HTTP endpoints can be accessed by any HTTP Client, like cURL or Web Browser, by default following are enabled:
 - /actuator/info
 - /actuator/health
 
@@ -838,3 +838,144 @@ JMX allows you to access Actuator MBeans under `org.springframework.boot` group.
 -Dcom.sun.management.jmxremote.authenticate=false
 -Dcom.sun.management.jmxremote.ssl=false
 ```
+
+### What are the actuator endpoints that are provided out of the box?
+
+|ID|Description|Enabled by default|Default Exposure via JMX|Default Exposure via Web|
+|---|---|---|---|---|
+|auditevents|Exposes audit events information for the current application.|Yes, but requires an AuditEventRepository bean|Yes|No|
+|beans|Displays a complete list of all the Spring beans in your application.|Yes|Yes|No|
+|caches|Exposes available caches.|Yes|Yes|No|
+|conditions|Shows the conditions that were evaluated on configuration and auto-configuration classes and the reasons why they did or did not match.|Yes|Yes|No|
+|configprops|Displays a collated list of all @ConfigurationProperties.|Yes|Yes|No|
+|env|Exposes properties from Spring’s ConfigurableEnvironment.|Yes|Yes|No|
+|flyway|Shows any Flyway database migrations that have been applied.|Yes|Yes|No|
+|health|Shows application health information.|Yes|Yes|Yes|
+|httptrace|Displays HTTP trace information (by default, the last 100 HTTP request-response exchanges).|Yes, but requires an HttpTraceRepository bean|Yes|No|
+|info|Displays arbitrary application info. |Yes| Yes| Yes
+|integrationgraph|Shows the Spring Integration graph.| Yes| Yes| No
+|loggers |Shows and modifies the configuration of loggers in the application.| Yes| Yes| No|
+|liquibase| Shows any Liquibase database migrations that have been applied. |Yes |Yes |No|
+|metrics |Shows ‘metrics’ information for the current application. |Yes |Yes |No|
+|mappings |Displays a collated list of all @RequestMapping paths. |Yes |Yes| No|
+|scheduledtasks |Displays the scheduled tasks in your application. |Yes |Yes |No|
+|sessions|Allows retrieval and deletion of user sessions from a Spring Session-backed session store. Not available when using Spring Session’s support for reactive web applications.|Yes |Yes |No|
+|shutdown| Lets the application be gracefully shutdown. |No |Yes| No|
+|threaddump| Performs a thread dump. |Yes |Yes |No|
+|prometheus|Exposes metrics in a format that can be scraped by a Prometheus server. |Only for Web Application |N/A |No|
+|heapdump|Returns an hprof heap dump file.| Only for Web Application |N/A |No|
+|jolokia|Exposes JMX beans over HTTP (when Jolokia is on the classpath, not available for WebFlux). |Only for Web Application |N/A |No|
+|logfile|Returns the contents of the logfile (if logging.file.name or logging.file.path properties have been set). Supports the use of the HTTP Range header to retrieve part of the log file’s content.|Only for Web Application|N/A|No|
+
+You can enable or disable Actuator Endpoints with usage of property:
+
+`management.endpoint.${ENDPOINT_NAME}.enabled=true`
+
+For example:
+- `management.endpoint.shutdown.enabled=true`
+- `management.endpoint.beans.enabled=false`
+- `management.endpoint.info.enabled=false`
+
+You can also disable ‘Enabled by default’ behavior with usage of property:
+
+`management.endpoints.enabled-by-default=false`
+
+You can change endpoints exposure with usage of properties:
+- `management.endpoints.jmx.exposure.exclude`
+- `management.endpoints.jmx.exposure.include`
+- `management.endpoints.web.exposure.exclude`
+- `management.endpoints.web.exposure.include`
+
+For example:
+
+`management.endpoints.web.exposure.include=info, health, env, beans`
+
+You can also expose all endpoints with usage of wildcard, for example:
+
+`management.endpoints.web.exposure.include=*`
+
+You can enable navigation through Actuator Endpoints, by usage of HATEOAS. 
+
+To enable this navigation, all you have to do is to add dependency to your project:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-hateoas</artifactId>
+</dependency>
+```
+
+After having this dependency, visiting main Actuator page: 
+
+`http://localhost:8080/actuator`
+
+Will give you `_links` element in response, that can be used for navigation.
+
+### What is info endpoint for? How do you supply data?
+
+Spring Boot Actuator `info` endpoint is used to provide arbitrary, non-sensitive, custom defined data, available at runtime that can provide additional information about started application.
+
+`info` endpoint is exposed by default via protocols:
+- `HTTP` at `/actuator/info`
+- `JMX` at `org.springframework.boot/Endpoint/Info`
+
+`info` endpoint is usually used to expose information like:
+- Application Name, Description, Version
+- Java Runtime Used
+- Git Information – see `git-commit-id-plugin`
+    - Branch
+    - Tag
+    - Commit ID
+- ...
+
+You can supply data to Spring Boot by using following methods:
+- With usage of property files, by defining `info.*` properties
+    ```properties
+    info.app.name=Spring Boot Application
+    info.app.description=This application exposes Spring Boot Actuator Endpoints
+    info.app.version=1.0.0
+    info.java-vendor=${java.specification.vendor}
+    ```
+- By implementing InfoContributor bean
+    ```java
+    @Component
+    public class SystemNameInfoContributor implements InfoContributor {
+        @Override
+        public void contribute(Info.Builder builder) {
+            builder.withDetail("system-name", System.getProperty("os.name"));
+        }
+    }
+    ```
+
+### How do you change logging level of a package using loggers endpoint?
+
+Spring Actuator allows you to list currently configured loggers with their levels in following ways:
+- via `HTTP` by visiting `/actuator/loggers` endpoint
+- via `JMX` by executing `org.springframework.boot/Endpoint/Loggers/Operations/loggers`
+
+`loggers` endpoint is exposed by default via `JMX`, to use it via HTTP you need to expose it by setting following property in `application.properties`:
+
+```properties
+management.endpoints.web.exposure.include=loggers
+```
+
+You can also view logging level for individual logger:
+- via `HTTP` by visiting `/actuator/loggers/${LOGGER_NAME}`, for example: `/actuator/loggers/com.app.pkgname`
+
+    ![pkg-log-level](images/04-pkg-log-level.png)
+
+- via `JMX` by executing `org.springframework.boot/Endpoint/Loggers/Operations/loggerLevels` with provided name parameter
+
+    ![jmx-pkg-log-level](images/04-jmx-pkg-log-level.png)
+
+You can change logging level for package by:
+- `HTTP` via `POST` to `/actuator/loggers/${LOGGER_NAME}`
+    ```
+    curl -i -X POST -H 'Content-Type: application/json' -d '{"configuredLevel": "TRACE"}' http://localhost:8080/actuator/loggers/com.app.question28
+    ```
+- `JMX` via `org.springframework.boot/Endpoint/Loggers/Operations/configureLogLevel` with name and configuredLevel parameters set
+
+    ![jmx-configure-log-level](images/04-jmx-configure-log-level.png)
+
+### How do you access an endpoint using a tag?
+
