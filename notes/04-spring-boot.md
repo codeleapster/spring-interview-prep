@@ -970,7 +970,7 @@ You can also view logging level for individual logger:
 
 You can change logging level for package by:
 - `HTTP` via `POST` to `/actuator/loggers/${LOGGER_NAME}`
-    ```
+    ```sh
     curl -i -X POST -H 'Content-Type: application/json' -d '{"configuredLevel": "TRACE"}' http://localhost:8080/actuator/loggers/com.app.question28
     ```
 - `JMX` via `org.springframework.boot/Endpoint/Loggers/Operations/configureLogLevel` with name and configuredLevel parameters set
@@ -978,4 +978,398 @@ You can change logging level for package by:
     ![jmx-configure-log-level](images/04-jmx-configure-log-level.png)
 
 ### How do you access an endpoint using a tag?
+
+You access an endpoint using a tag by defining it as part of the request in following way: `tag=KEY:VALUE`.
+
+For example:
+
+```
+/actuator/metrics/http.server.requests?tag=status:200
+
+/actuator/metrics/jvm.memory.max?tag=area:heap
+```
+
+You can also use multiple tags in one query with usage of & in following way: `tag=KEY1:VALUE1&tag=KEY2:VALUE2`
+
+For example:
+```
+/actuator/metrics/http.server.requests?tag=status:200&tag=method:GET
+
+/actuator/metrics/jvm.memory.max?tag=area:heap&tag=id:G1%20Old%20Gen
+```
+
+Tag is used to filter results of query by one or multiple dimensions. It is often used with metrics endpoint for data filtering.
+
+### What is metrics for?
+
+Spring Actuator provides `metrics` endpoint which can be used to examine metrics collected by the application during runtime.
+
+`metrics` endpoint allows you to view information about specific metric by visiting metric dedicated URI, for example `/actuator/metrics/process.cpu.usage`
+
+`metrics` endpoint allows you to drill down information further by usage of available tags, for example `/actuator/metrics/jvm.memory.used?tag=area:heap`
+
+`metrics` endpoint allows you to view many out-of-the box defined metrics:
+- CPU Usage, CPU Core Count
+- Memory Usage, Max Memory Available
+- Threads Info
+- Garbage Collector Statistics
+- HTTP Requests Info
+- Embedded Tomcat Related Metrics
+- ... (many more, also you can define custom metrics)
+
+`metrics` endpoint is not exposed via Web by default, to have it available, you need to add following entry to `application.properties`: `management.endpoints.web.exposure.include=metrics`
+
+### How do you create a custom metric with or without tags?
+
+Spring Boot Actuator allows you to create custom metrics with usage of
+`MeterRegistry` from Micrometer Application Metrics Facade.
+
+Micrometer used by Spring Boot Actuator allows you to register following Meter Primitives that will be exposed via `/actuator/metrics` endpoint:
+- Counter
+- Gauge
+- Timer
+- TimeGauge
+- DistributionSummary
+- LongTaskTimer
+- FunctionCounter
+- FunctionTimer
+
+You can get more information on Meter Primitives from Micrometer: [See Micrometer Documentation](https://docs.micrometer.io/micrometer/reference/)
+
+Registration of metric can be done via method inside MeterRegistry:
+
+```java
+Counter objectsCount = meterRegistry.counter("storage.object.count", "type", "db");
+```
+
+or via usage of builder:
+
+```java
+Counter objectsCount = Counter.builder("storage.object.count")
+        .tag("type", "db")
+        .register(meterRegistry);
+```
+
+### What is Health Indicator?
+
+Health Indicator is a component used by `/actuator/health` endpoint to check if system is in a state which can be used to successfully handle requests.
+
+`/actuator/health` endpoint is returning aggregated information on system status by evaluating all Health Indicators registered in `HealthIndicatorRegistry`.
+
+`/actuator/health` endpoint is exposed by default via both `JMX` and `Web`, however default configuration is exposing only minimal set of information.
+
+This endpoint is used, usually by monitoring software, to periodically check system status, upon receiving failed status, automated alert is sent to product support team.
+
+Monitoring endpoint like this, is also very useful when building Highly Available and Fault Tolerant Architecture, in this case such endpoint can be used by Load Balancer to check which instances are healthy and can accept traffic.
+
+To change level of details exposed by `/actuator/health` endpoint, following properties can be used:
+- `management.endpoint.health.show-details`
+- `management.endpoint.health.show-components`
+
+Both of them can support following values:
+- `never` – detailed information are never shown (default value)
+- `when-authorized` – show information to users with roles from property `management.endpoint.health.roles`
+- `always` – detailed information are shown to all users
+
+To create custom Health Indicator, Spring Bean has to be created that implements
+`HealthIndicator` interface:
+
+```java
+@Component
+public class CustomHealthIndicator implements HealthIndicator {
+    @Override
+    public Health health() {
+        return Health.up()
+                .withDetail("system-ready", true)
+                .build();
+    }
+}
+```
+
+### What are the Health Indicators that are provided out of the box?
+
+Spring Actuator provides following Health Indicators that are configured when proper dependencies are found:
+- `ApplicationHealthIndicator` - Default Implementation, always up.
+- `DiskSpaceHealthIndicator` - Checks for low disk space.
+- `DataSourceHealthIndicator` - Checks the status of a DataSource and optionally
+runs a test query.
+- `CassandraHealthIndicator` - Checks that a Cassandra database is up.
+- `CouchbaseHealthIndicator` - Checks that a Couchbase cluster is up.
+- `ElasticsearchHealthIndicator` - Checks that an Elasticsearch cluster is up.
+- `HazelcastHealthIndicator` - Checks that a Hazelcast server is up.
+- `InfluxDbHealthIndicator` - Checks that an InfluxDB server is up.
+- `JmsHealthIndicator` - Checks that a JMS broker is up.
+- `MailHealthIndicator` - Checks that a mail server is up.
+- `MongoHealthIndicator` - Checks that a Mongo database is up.
+- `RabbitHealthIndicator` - Checks that a Rabbit server is up.
+- `RedisHealthIndicator` - Checks that a Redis server is up.
+- `SolrHealthIndicator` - Checks that a Solr server is up.
+- `Neo4jHealthIndicator` - Checks the status of a Neo4j by executing a Cypher.
+
+Spring Actuator also provides Reactive Health Indicators for reactive applications, like those using Spring WebFlux:
+- `CassandraReactiveHealthIndicator` - Checks that a Cassandra database is up.
+- `CouchbaseReactiveHealthIndicator` - Checks that a Couchbase cluster is up.
+- `MongoReactiveHealthIndicator` - Checks that a Mongo database is up.
+- `RedisReactiveHealthIndicator` - Checks that a Redis server is up.
+
+### What is the Health Indicator status?
+
+Health Indicator status is used by `Health Indicators` to inform Spring Actuator if system component checked by them is working correctly or not. 
+
+Each Health Indicator is expected to return status that represents guarded component state, status can be one of following:
+- `UP`
+- `DOWN`
+- `OUT_OF_SERVICE`
+- `UNKNOWN`
+- `Custom Defined`
+
+Spring Actuator is also using `HealthAggregator`, especially `OrderedHealthAggregator` to aggregate statuses from all Health Indicators and decide on final status. `OrderedHealthAggregator` is taking statuses from all Health Indicators, sorts them by predefined order (`DOWN`, `OUT_OF_SERVICE`, `UP`, `UNKNOWN`), and takes first element after sorting, which represents highest priority status and becomes final status of the system.
+
+### What are the Health Indicator statuses that are provided out of the box?
+
+Spring Actuator provides following Health Indicator Statuses out of the box:
+- `UP` - component or subsystem is functioning as expected
+- `DOWN` - component or subsystem has suffered an unexpected failure
+- `OUT_OF_SERVICE` - component or subsystem has been taken out of service and should not be used
+- `UNKNOWN` - component or subsystem is in an unknown state
+
+Based on Health Indicator Statuses from above, Spring will also perform default mapping of status to HTTP Response Code with usage of `HealthStatusHttpMapper` that follows this default configuration:
+- `UP` -> HTTP 200
+- `UNKNOWN` -> HTTP 200
+- `DOWN` -> HTTP 503
+- `OUT_OF_SERVICE` -> HTTP 503
+
+You can change default mapping with usage of `management.health.status.httpmapping` property, for example:
+
+```properties
+management.health.status.http-mapping.DOWN=501
+```
+
+### How do you change the Health Indicator status severity order?
+
+Spring Actuator allows you to change Health Indicator Status severity order with usage of property `management.health.status.order` for example:
+
+```properties
+management.health.status.order=system-halted, DOWN, OUT_OF_SERVICE, UNKNOWN, UP
+```
+
+This property will be injected into `HealthIndicatorProperties` and used by `OrderedHealthAggregator` to resolve final status for application by aggregating statuses from all Health Indicators available in the system.
+
+### Why do you want to leverage 3rd-party external monitoring system?
+
+It is a good idea to use external monitoring system, because this way you can use monitoring functionalities without having to spend time coding them.
+
+External monitoring system usually provides:
+- Durable persistent storage
+- Tested way of ingesting massive amount of data
+- A way to query for data
+- A way to perform data visualization
+- Configurable Dashboards
+- Configurable alerting
+
+Spring Actuator uses Micrometer Application Metrics Facade which integrates with number of external monitoring systems. Provided dependency management and auto-configuration makes it easy to integrate Micrometer into your project.
+
+Spring Boot supports following monitoring systems:
+- AppOptics
+- Atlas
+- Datadog
+- Dynatrace
+- Elastic
+- Ganglia
+- Graphite
+- Humio
+- Influx
+- JMX
+- KairosDB
+- New Relic
+- Prometheus
+- SignalFx
+- Simple (in-memory)
+- StatsD
+- Wavefront
+
+Configuring external monitoring system is as easy as adding dependency:
+```xml
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-${monitoring-system-name}</artifactId>
+</dependency>
+```
+You might also need to configure some properties, for example:
+
+```properties
+management.metrics.export.elastic.host=http://localhost:9200
+```
+
+## Spring Boot Testing
+
+### When do you want to use @SpringBootTest annotation?
+
+You should use `@SpringBootTest` annotation whenever writing JUnit Integration Test for product that is using Spring Boot.
+
+Spring Boot approach to Integration Testing simplifies it by eliminating requirement of application deployment or establishing connection to other infrastructure.
+
+`@SpringBootTest` annotation enables Spring Boot specific features on top of Spring Test that are useful for testing, like:
+- Automated Context creation through `SpringApplication` class
+- Web Environment for Testing – `Mocked` or `Embedded`
+- Mocked Bean Injection via `@MockBean` annotation
+- Spy Injection via `@SpyBean` annotation
+- Ability to customize created context with `@TestConfiguration` annotated classes
+- Auto configurations for:
+    - MVC Testing
+    - JSON Testing
+    - JPA Tests
+    - JDBC Tests
+    - Mongo Db Tests
+    - and much more...
+
+To use `@SpringBootTest` annotation:
+- for JUnit4, you will need to add `@RunWith(SpringRunner.class)` annotation on top of your test class
+- for JUnit 5 `@ExtendWith(SpringExtension.class)` annotation is already contained in `@SpringBootTest` annotation.
+
+Next you need to use `@SpringBootTest` annotation:
+
+```java
+@RunWith(SpringRunner.class)
+@SpringBootTest
+public class HelloControllerTest {
+    @Test
+    public void shouldPerformSomeActionCorrectly() throws Exception {
+        ...
+    }
+}
+```
+
+### What does @SpringBootTest auto-configure?
+
+`@SpringBootTest` annotation will auto-configure:
+- `ApplicationContext` for testing
+- Test itself with tools used for testing
+
+`ApplicationContext` is configured by searching for `@SpringBootApplication` or `@SpringBootConfiguration` annotated classes, based on those bean definitions will be created.
+
+It is also possible to test only slice of the application with usage one of following:
+- `@SpringBootTest#classes`
+- `@ContextConfiguration#classes`
+- `@AutoConfigure…` annotations
+
+`@AutoConfigure…` annotations allows you to configure specific environment and tools for testing, for example `@AutoConfigureMockMvc` will configure Mock Mvc that can be used for Controllers testing.
+
+Spring Boot Test includes annotations that are wrapping `@AutoConfigure…` annotations and make test development simpler:
+- `@JsonTest`
+- `@WebMvcTest`
+- `@WebFluxTest`
+- `@DataJpaTest`
+- `@JdbcTest`
+- `@JooqTest`
+- `@DataMongoTest`
+- `@DataLdapTest`
+- `@RestClientTest`
+- ...
+
+Each of this annotation uses `@AutoConfigure…` annotations and also `@ExtendWith(SpringExtension.class)` for JUnit 5, which makes test
+development easier.
+
+### What dependencies does spring-boot-starter-test brings to the classpath?
+
+spring-boot-starter-test brings following dependencies:
+- JUnit - Unit Testing for Java Applications
+- Spring Test - Spring Framework Support for Testing
+- Spring Boot Test - Utilities and Integration Test Support for Spring Boot
+- AssertJ - Fluent Assertion Library
+- Hamcrest - Matchers Library
+- Mockito - Mocking Framework
+- JSONassert - JSON Assertion Library
+- JsonPath - XPath for JSON
+- XMLUnit - Tools for XML verification
+
+You can see list of all dependencies with versions for maven module by running following command: `mvn dependency:tree`
+
+### How do you perform integration testing with @SpringBootTest for a web application?
+
+Integration Test by definition, should check interactions between few components of the system (at least two real, not-mocked components) to check if those components are delivering expected functionalities when working together. In each case when writing Integration Test you should decide how many components should interact in the test for it to be meaningful. Usually you should decide on smallest possible amount of components that are enough to test specific functionality. Components that are not meaningful can be omitted, or mocked with usage of `@MockBean` annotation.
+
+Web components tests (Controller Tests, Rest Controller Tests), if tested in Integration way, should be written in a way for test to make a HTTP Request and check HTTP Response. This kind of approach results in meaningful test, which delivers feedback that actually checks if component works correctly.
+
+Spring Boot allows you to write Integration Tests for Web Components in two ways:
+- MockMvc
+
+    ```java
+    @RunWith(SpringRunner.class)
+    @SpringBootTest
+    @AutoConfigureMockMvc
+    public class CityControllerWebMockMvcTest {
+
+        @Autowired
+        private MockMvc mvc;
+
+        @Test
+        public void should...() throws Exception {
+            ...
+        }
+    }
+    ```
+
+- Embedded Container
+
+    ```java
+    @RunWith(SpringRunner.class)
+    @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+    public class CityControllerWebIntegrationTest {
+        
+        @LocalServerPort
+        private int port;
+        
+        @Autowired
+        private TestRestTemplate restTemplate;
+        
+        @Test
+        public void should...() {
+            ...
+        }
+    }
+    ```
+
+### When do you want to use @WebMvcTest? What does it auto-configure?
+
+You should use `@WebMvcTest` annotation when you want to write Integration Test that is focused on web layer of your application. `@WebMvcTest` approach will create `ApplicationContext` that contains only web components and omits any other components that are not part of web layer. Other components, if required for the test, can be mocked with usage of `@MockBean` annotation or delivered by `@Configuration` annotated class imported with usage of `@Import` annotation. 
+
+`@WebMvcTest` supports two cases:
+- Single Controller Auto-Configuration – annotate test by providing Controller class - `@WebMvcTest(CityController.class)`
+- Multiple (All found) Controllers Auto-Configuration – just annotate test with
+`@WebMvcTest`
+
+`@WebMvcTest` annotation will auto-configure:
+- Mock Mvc
+- `@Controller` annotated class
+- `@ControllerAdvice` annotated class
+- `@JsonComponent` annotated class
+- `@Converter` annotated class
+- `@GenericConverter` annotated class
+- `@Filter` annotated class
+- `@WebMvcConfigurer` annotated class
+- `@HandlerMethodArgumentResolver` annotated class
+
+### What are the differences between @MockBean and @Mock?
+
+`@Mock` annotation comes from Mockito Framework which allows for easy Mock creation. This annotation is used by `MockitoJUnitRunner`, each field annotated with it will have Mock for specified class created. This annotation does not inject mocks into tested class on itself, to use injection you need to have target class annotated with `@InjectMocks` annotation.
+
+`@MockBean` annotation comes from spring-boot-test, it creates Mockito Mock and also injects it into Application Context created by `@SpringBootTest`. All beans which refers to mocked class via `@Autowired` will get this mock injected instead of real class.
+
+Main difference between `@MockBean` and `@Mock` annotation is that `@MockBean` creates mock and **injects it into Application Context**, while `@Mock` annotation only creates it, if you want to inject it, you can do it manually or with `@InjectMocks` annotation, however injection is being done **to the class not whole Application Context**.
+
+### When do you want use @DataJpaTest for? What does it auto-configure?
+
+You want to use `@DataJpaTest` annotation whenever writing an Integration Test for JPA related components of your application like `Entities` or `Repositories`.
+
+@DataJpaTest annotation configures:
+- In-memory embedded database – behavior can be disabled with `@AutoConfigureTestDatabase(replace = Replace.NONE)`
+- Scans and configures `@Entity` beans
+- Scans and configures Spring Data Repositories
+- Configures `TestEntityManager`
+- Does not load other components like `@Component`, `@Service`, `@Controller` etc.
+
+Every `@DataJpaTest` is transactional by default, after each test transaction is rolled back. You can use @Transactional annotation to customize this behavior.
+
+When using `@DataJpaTest` you can access `TestEntityManager`, which contains subset of `EntityManager` methods that are useful for testing.
 
