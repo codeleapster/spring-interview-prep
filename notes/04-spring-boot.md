@@ -1362,7 +1362,7 @@ Main difference between `@MockBean` and `@Mock` annotation is that `@MockBean` c
 
 You want to use `@DataJpaTest` annotation whenever writing an Integration Test for JPA related components of your application like `Entities` or `Repositories`.
 
-@DataJpaTest annotation configures:
+`@DataJpaTest` annotation configures:
 - In-memory embedded database – behavior can be disabled with `@AutoConfigureTestDatabase(replace = Replace.NONE)`
 - Scans and configures `@Entity` beans
 - Scans and configures Spring Data Repositories
